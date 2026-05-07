@@ -191,7 +191,7 @@ col_t2.checkbox("40 L", key="input_t40")
 
 st.button("Uložiť záznam", type="primary", on_click=save_record_callback)
 
-# --- VÝPOČET PALIVA: NOVÁ PODMIENKA (ZELENÁ > 60 MINÚT) ---
+# --- VÝPOČET PALIVA SO ZOSTATKOM A NOVOU PODMIENKOU IKONY ---
 if not full_df_with_minutes.empty:
     df_asc = full_df_with_minutes.sort_values(['Date', 'SortValue'], ascending=[True, True])
     tank_indices = df_asc.index[df_asc['Tankovanie'] != "-"].tolist()
@@ -227,8 +227,9 @@ if not full_df_with_minutes.empty:
             minutky = zostava_zaokruhlene % 60
             cas_text = f"{hod}h {minutky:02d}min"
             
-            # --- OPRAVENÁ PODMIENKA PRE IKONU (60 minút) ---
-            farba_ikona = "✅" if zostava_zaokruhlene > 60 else "⚠️❗"
+            # --- PODMIENKA PRE IKONU ---
+            # ✅ ak zostáva viac ako 270 min (60L), inak ⚠️❗
+            farba_ikona = "✅" if zostava_zaokruhlene >= 270 else "⚠️❗"
         else:
             cas_text = "NÁDRŽ JE PRÁZDNA"
             farba_ikona = "🚨"
