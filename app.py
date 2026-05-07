@@ -191,59 +191,59 @@ col_t2.checkbox("40 L", key="input_t40")
 
 st.button("Uložiť záznam", type="primary", on_click=save_record_callback)
 
-# --- VÝPOČET: POSLEDNÉ TANKOVANIE + PRENOS ZOSTATKU ---
+# --- VÝPOČET: POSLEDNÉ TANKOVANIE + PRENOS ZOSTATKU + ČAS DOZADU ---
 if not full_df_with_minutes.empty:
-    # 1. Nájdeme všetky tankovania zoradené od najstaršieho po najnovšie
+    # Zoradíme od najstaršieho po najnovšie pre korektný výpočet
     df_asc = full_df_with_minutes.sort_values(['Date', 'SortValue'], ascending=[True, True])
     tank_indices = df_asc.index[df_asc['Tankovanie'] != "-"].tolist()
 
     if tank_indices:
-        # Index posledného (najnovšieho) tankovania
+        # Index úplne posledného tankovania
         last_tank_idx = tank_indices[-1]
         
-        # Zistíme, koľko litrov sa nalialo v tomto poslednom tankovaní
+        # 1. Info o poslednom tankovaní
         objem_posledne = df_asc.loc[last_tank_idx, 'Tankovanie']
-        nove_litre = 0
-        if "20 L" in objem_posledne: nove_litre += 20
-        if "40 L" in objem_posledne: nove_litre += 40
-        nove_minuty = nove_litre * 4.5
-
-        # 2. VÝPOČET ZOSTATKU Z MINULA (všetko pred týmto tankovaním)
-        # Celkový kredit zo všetkých PREDCHÁDZAJÚCICH tankovaní
+        
+        # 2. VÝPOČET MINÚT DOZADU (ako dávno sa tankovalo)
+        pos_v_tabulke = df_asc.index.get_loc(last_tank_idx)
+        jazdy_po_tankovani = df_asc.iloc[pos_v_tabulke + 1:]['Minúty'].sum()
+        
+        # 3. VÝPOČET ZOSTATKU (Prenos z minulých tankovaní)
+        # Kredit zo všetkých tankovaní predtým
         predosle_tankovania = df_asc.loc[tank_indices[:-1]]
         kredit_minula = 0
         for t in predosle_tankovania['Tankovanie']:
             if "20 L" in t: kredit_minula += 90
             if "40 L" in t: kredit_minula += 180
         
-        # Všetky jazdy od úplného začiatku až po moment TOHTO tankovania
-        pos_v_tabulke = df_asc.index.get_loc(last_tank_idx)
         jazdy_do_tankovania = df_asc.iloc[:pos_v_tabulke]['Minúty'].sum()
-        
         zostatok_z_minula = max(0, kredit_minula - jazdy_do_tankovania)
 
-        # 3. AKTUALNY STAV (Zostatok z minula + Nové minúty - Jazdy PO tankovaní)
-        jazdy_po_tankovani = df_asc.iloc[pos_v_tabulke + 1:]['Minúty'].sum()
+        # 4. NOVÝ KREDIT A CELKOVÝ STAV
+        nove_litre = 0
+        if "20 L" in objem_posledne: nove_litre += 20
+        if "40 L" in objem_posledne: nove_litre += 40
+        nove_minuty = nove_litre * 4.5
         
         zostava_presne = (nove_minuty + zostatok_z_minula) - jazdy_po_tankovani
 
-        # 4. ZAOKRÚHĽOVANIE A VIZUÁL
+        # 5. ZAOKRÚHĽOVANIE A IKONY
         if zostava_presne > 0:
             zostava_zaokruhlene = int(zostava_presne // 10) * 10
             hod = zostava_zaokruhlene // 60
             minutky = zostava_zaokruhlene % 60
             cas_text = f"{hod}h {minutky:02d}min"
             
-            # Varovanie pri 60 minútach
+            # ✅ nad 60 minút, ⚠️❗ pri 60 a menej
             farba_ikona = "✅" if zostava_zaokruhlene > 60 else "⚠️❗"
         else:
             cas_text = "NÁDRŽ JE PRÁZDNA"
             farba_ikona = "🚨"
 
-        # Zobrazenie
-        st.info(f"⛽ **Posledné ({objem_posledne}):** | {farba_ikona} **V nádrži celkom (so zostatkom):** {cas_text}")
+        # Zobrazenie výsledku
+        st.info(f"⛽ **Posledné ({objem_posledne}):** pred **{int(jazdy_po_tankovani)} min** | {farba_ikona} **V nádrži celkom:** {cas_text}")
     else:
-        st.warning("⛽ Žiadne tankovanie. Dojazd sa vypočíta po zadaní litrov.")
+        st.warning("⛽ Žiadne tankovanie v databáze.")
 
 # Zobrazenie hlásení (success/error)
 if 'action_msg' in st.session_state:
