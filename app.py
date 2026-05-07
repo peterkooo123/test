@@ -191,50 +191,47 @@ col_t2.checkbox("40 L", key="input_t40")
 
 st.button("Uložiť záznam", type="primary", on_click=save_record_callback)
 
-# --- VÝPOČET PALIVA ---
+# --- VÝPOČET PALIVA OD POSLEDNÉHO TANKOVANIA ---
 if not full_df_with_minutes.empty:
-    # 1. Spočítame celkový počet odjazdených minút (suma stĺpca Minúty)
-    celkove_odjazdene_minuty = full_df_with_minutes['Minúty'].sum()
-
-    # 2. Spočítame celkový objem natankovaného paliva z celej histórie
+    # 1. Nájdeme všetky záznamy, kde sa tankovalo
     vsetky_tankovania = full_df_with_minutes[full_df_with_minutes['Tankovanie'] != "-"]
-    
-    celkovy_objem_litrov = 0
-    for t in vsetky_tankovania['Tankovanie']:
-        if "20 L" in t: celkovy_objem_litrov += 20
-        if "40 L" in t: celkovy_objem_litrov += 40
 
-    # 3. Prepočet na minúty (pomer: 20L = 90min => 1L = 4.5min)
-    vydrz_minuty_celkovo = celkovy_objem_litrov * 4.5
-    
-    # 4. Zostávajúce minúty v nádrži
-    zostava_minut = vydrz_minuty_celkovo - celkove_odjazdene_minuty
-
-    # 5. Formátovanie času na Hodiny a Minúty
-    if zostava_minut > 0:
-        hod = int(zostava_minut // 60)
-        minutky = int(zostava_minut % 60)
-        cas_text = f"{hod}h {minutky}min"
-        # Farba boxu podľa dojazdu
-        if zostava_minut > 45: farba_ikona = "✅"
-        elif zostava_minut > 15: farba_ikona = "⚠️"
-        else: farba_ikona = "⛽❗"
-    else:
-        cas_text = "NÁDRŽ JE PRÁZDNA"
-        farba_ikona = "🚨"
-
-    # --- ZOBRAZENIE INFO BOXU ---
     if not vsetky_tankovania.empty:
-        posledne_tank = vsetky_tankovania.iloc[0] # Najnovšie tankovanie
-        objem_posledne = posledne_tank['Tankovanie']
+        # Zoberieme úplne posledné (najnovšie) tankovanie
+        posledne_tank_row = vsetky_tankovania.iloc[0]
+        objem_posledne = posledne_tank_row['Tankovanie']
         
-        # Koľko sa odjazdilo presne od posledného kliknutia na tankovanie
-        idx_last = full_df_with_minutes.index.get_loc(vsetky_tankovania.index[0])
-        od_posledneho = full_df_with_minutes.iloc[:idx_last]['Minúty'].sum()
+        # Zistíme, koľko litrov sa naposledy nalialo
+        litrov_posledne = 0
+        if "20 L" in objem_posledne: litrov_posledne = 20
+        if "40 L" in objem_posledne: litrov_posledne = 40
+        if "20 L + 40 L" in objem_posledne or "40 L + 20 L" in objem_posledne: litrov_posledne = 60
 
-        st.info(f"⛽ **Posledné ({objem_posledne}):** pred {int(od_posledneho)} min | {farba_ikona} **Dojazd cca:** {cas_text}")
+        # 2. Výpočet kapacity z tohto tankovania (20L = 90min => 1L = 4.5min)
+        kapacita_minut = litrov_posledne * 4.5
+
+        # 3. Spočítame minúty odjazdené OD tohto tankovania doteraz
+        # Nájdeme pozíciu tohto tankovania v tabuľke
+        idx_posledne = full_df_with_minutes.index.get_loc(vsetky_tankovania.index[0])
+        # Sčítame minúty v riadkoch, ktoré sú NAD týmto záznamom (novšie záznamy)
+        odjazdene_od_tankovania = full_df_with_minutes.iloc[:idx_posledne]['Minúty'].sum()
+
+        # 4. Zostatok
+        zostava_minut = kapacita_minut - odjazdene_od_tankovania
+
+        # Formátovanie textu
+        if zostava_minut > 0:
+            hod = int(zostava_minut // 60)
+            minutky = int(zostava_minut % 60)
+            cas_text = f"{hod}h {minutky}min"
+            farba_ikona = "✅" if zostava_minut > 20 else "⚠️"
+        else:
+            cas_text = "PRÁZDNA (natankuj!)"
+            farba_ikona = "🚨"
+
+        st.info(f"⛽ **Posledné ({objem_posledne}):** pred {int(odjazdene_od_tankovania)} min | {farba_ikona} **V nádrži ešte cca:** {cas_text}")
     else:
-        st.warning("⛽ Nebolo nájdené žiadne tankovanie. Zadaj tankovanie pre výpočet dojazdu.")
+        st.warning("⛽ Nebolo nájdené žiadne tankovanie. Dojazd sa počíta od posledného zadania '20L/40L'.")
 
 # Zobrazenie hlásení (success/error)
 if 'action_msg' in st.session_state:
@@ -244,7 +241,6 @@ if 'action_msg' in st.session_state:
     del st.session_state.action_msg
 
 st.divider()
-
 # --- SEKCIA 2: HISTÓRIA ---
 st.header("História")
 hist_datum = st.date_input("Dátum histórie", date.today(), key="historia_datum")
