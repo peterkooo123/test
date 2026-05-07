@@ -22,7 +22,7 @@ jobs:
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: 🏄 Minúty 2026 - Denná záloha
-          to: tvoj_email@gmail.com  # <--- SEM NAPÍŠ SVOJ MAIL, KAM TO MÁ CHODIŤ
+          to: oknardrevak@gmail.com  # <--- SEM NAPÍŠ SVOJ MAIL, KAM TO MÁ CHODIŤ
           from: GitHub Backup Bot
           body: Ahoj, v prilohe posielam aktualny subor data.csv z tvojho Gistu.
           attachments: zaloha_dat.csv
