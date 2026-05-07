@@ -191,59 +191,45 @@ col_t2.checkbox("40 L", key="input_t40")
 
 st.button("Uložiť záznam", type="primary", on_click=save_record_callback)
 
-# --- VÝPOČET: POSLEDNÉ TANKOVANIE + PRENOS ZOSTATKU ---
+# --- VÝPOČET PALIVA OD POSLEDNÉHO TANKOVANIA (ZAOKRÚHLENÉ) ---
 if not full_df_with_minutes.empty:
-    # 1. Nájdeme všetky tankovania zoradené od najstaršieho po najnovšie
-    df_asc = full_df_with_minutes.sort_values(['Date', 'SortValue'], ascending=[True, True])
-    tank_indices = df_asc.index[df_asc['Tankovanie'] != "-"].tolist()
+    # 1. Nájdeme všetky záznamy, kde sa tankovalo
+    vsetky_tankovania = full_df_with_minutes[full_df_with_minutes['Tankovanie'] != "-"]
 
-    if tank_indices:
-        # Index posledného (najnovšieho) tankovania
-        last_tank_idx = tank_indices[-1]
+    if not vsetky_tankovania.empty:
+        # Zoberieme úplne posledné (najnovšie) tankovanie
+        posledne_tank_row = vsetky_tankovania.iloc[0]
+        objem_posledne = posledne_tank_row['Tankovanie']
         
-        # Zistíme, koľko litrov sa nalialo v tomto poslednom tankovaní
-        objem_posledne = df_asc.loc[last_tank_idx, 'Tankovanie']
-        nove_litre = 0
-        if "20 L" in objem_posledne: nove_litre += 20
-        if "40 L" in objem_posledne: nove_litre += 40
-        nove_minuty = nove_litre * 4.5
+        # Zistíme litre (20L=90min, 40L=180min, 60L=270min)
+        litrov_posledne = 0
+        if "20 L" in objem_posledne: litrov_posledne += 20
+        if "40 L" in objem_posledne: litrov_posledne += 40
+        
+        kapacita_minut = litrov_posledne * 4.5
 
-        # 2. VÝPOČET ZOSTATKU Z MINULA (všetko pred týmto tankovaním)
-        # Celkový kredit zo všetkých PREDCHÁDZAJÚCICH tankovaní
-        predosle_tankovania = df_asc.loc[tank_indices[:-1]]
-        kredit_minula = 0
-        for t in predosle_tankovania['Tankovanie']:
-            if "20 L" in t: kredit_minula += 90
-            if "40 L" in t: kredit_minula += 180
-        
-        # Všetky jazdy od úplného začiatku až po moment TOHTO tankovania
-        pos_v_tabulke = df_asc.index.get_loc(last_tank_idx)
-        jazdy_do_tankovania = df_asc.iloc[:pos_v_tabulke]['Minúty'].sum()
-        
-        zostatok_z_minula = max(0, kredit_minula - jazdy_do_tankovania)
+        # 2. Spočítame minúty odjazdené OD tohto tankovania doteraz
+        idx_posledne = full_df_with_minutes.index.get_loc(vsetky_tankovania.index[0])
+        odjazdene_od_tankovania = full_df_with_minutes.iloc[:idx_posledne]['Minúty'].sum()
 
-        # 3. AKTUALNY STAV (Zostatok z minula + Nové minúty - Jazdy PO tankovaní)
-        jazdy_po_tankovani = df_asc.iloc[pos_v_tabulke + 1:]['Minúty'].sum()
+        # 3. Zostatok a zaokrúhlenie na 10 minút nadol
+        zostava_presne = kapacita_minut - odjazdene_od_tankovania
         
-        zostava_presne = (nove_minuty + zostatok_z_minula) - jazdy_po_tankovani
-
-        # 4. ZAOKRÚHĽOVANIE A VIZUÁL
         if zostava_presne > 0:
+            # Zaokrúhlenie: napr. 54 -> 50, 59 -> 50, 61 -> 60
             zostava_zaokruhlene = int(zostava_presne // 10) * 10
+            
             hod = zostava_zaokruhlene // 60
             minutky = zostava_zaokruhlene % 60
-            cas_text = f"{hod}h {minutky:02d}min"
-            
-            # Varovanie pri 60 minútach
-            farba_ikona = "✅" if zostava_zaokruhlene > 60 else "⚠️❗"
+            cas_text = f"{hod}h {minutky:02d}min" # Formát 0h 50min
+            farba_ikona = "✅" if zostava_zaokruhlene > 20 else "⚠️"
         else:
-            cas_text = "NÁDRŽ JE PRÁZDNA"
+            cas_text = "PRÁZDNA (natankuj!)"
             farba_ikona = "🚨"
 
-        # Zobrazenie
-        st.info(f"⛽ **Posledné ({objem_posledne}):** | {farba_ikona} **V nádrži celkom (so zostatkom):** {cas_text}")
+        st.info(f"⛽ **Posledné ({objem_posledne}):** pred {int(odjazdene_od_tankovania)} min | {farba_ikona} **V nádrži ešte cca:** {cas_text}")
     else:
-        st.warning("⛽ Žiadne tankovanie. Dojazd sa vypočíta po zadaní litrov.")
+        st.warning("⛽ Nebolo nájdené žiadne tankovanie. Začni zadaním 20L/40L.")
 
 # Zobrazenie hlásení (success/error)
 if 'action_msg' in st.session_state:
