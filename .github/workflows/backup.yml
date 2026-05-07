@@ -1,0 +1,28 @@
+name: Vecerna zaloha minut
+
+on:
+  schedule:
+    # 20:00 UTC je 22:00 nášho času (v lete)
+    - cron: '0 20 * * *'
+  workflow_dispatch: # Toto pridá tlačidlo na ručné spustenie
+
+jobs:
+  send_email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stiahnutie suboru z Gistu
+        run: |
+          curl -L https://gist.githubusercontent.com/raw/${{ secrets.GIST_ID }}/data.csv -o zaloha_dat.csv
+
+      - name: Odoslanie mailu
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 🏄 Minúty 2026 - Denná záloha
+          to: tvoj_email@gmail.com  # <--- SEM NAPÍŠ SVOJ MAIL, KAM TO MÁ CHODIŤ
+          from: GitHub Backup Bot
+          body: Ahoj, v prilohe posielam aktualny subor data.csv z tvojho Gistu.
+          attachments: zaloha_dat.csv
