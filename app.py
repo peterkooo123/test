@@ -241,7 +241,7 @@ if not full_df_with_minutes.empty:
             farba_ikona = "🚨"
 
         # Zobrazenie výsledku
-        st.info(f"⛽ **Posledné ({objem_posledne}):** pred **{int(jazdy_po_tankovani)} minú** | {farba_ikona} **V nádrži zostáva cca:** {cas_text}")
+        st.info(f"⛽ **Posledné ({objem_posledne}):** pred **{int(jazdy_po_tankovani)} min** | {farba_ikona} **V nádrži zostáva cca:** {cas_text}")
     else:
         st.warning("⛽ Žiadne tankovanie v databáze.")
 
